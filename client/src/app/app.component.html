@@ -1,0 +1,171 @@
+<!-- client/src/app/app.component.html -->
+<div class="scriptflow-container">
+  <!-- SIDEBAR: Story Bible Management (25%) -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1 class="app-title">📖 Story Bible</h1>
+      <p class="app-subtitle">Your narrative foundation</p>
+    </div>
+
+    <!-- Lore Input Section -->
+    <div class="lore-input-section">
+      <label for="lore-input" class="input-label">Add Lore</label>
+      <textarea
+        id="lore-input"
+        [(ngModel)]="loreInput"
+        placeholder="Enter a fact about your world, character, or story..."
+        class="lore-textarea"
+        rows="4"
+      ></textarea>
+
+      <button
+        (click)="saveLore()"
+        [disabled]="isLoadingLore"
+        class="btn btn-primary"
+        [class.loading]="isLoadingLore"
+      >
+        <span *ngIf="!isLoadingLore">💾 Save to DB</span>
+        <span *ngIf="isLoadingLore" class="spinner-inline">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </span>
+      </button>
+    </div>
+
+    <!-- Recent Lore List -->
+    <div class="recent-lore-section">
+      <h3 class="section-title">Recent Lore</h3>
+
+      <div *ngIf="recentLore.length === 0" class="empty-state">
+        <p>No lore entries yet.</p>
+        <p class="hint">Start building your story world above.</p>
+      </div>
+
+      <div *ngIf="recentLore.length > 0" class="lore-list">
+        <div *ngFor="let entry of recentLore; let i = index" class="lore-card">
+          <div class="lore-content">
+            <p class="lore-text">{{ entry.fact }}</p>
+            <p class="lore-timestamp">
+              {{ entry.timestamp | date: 'short' }}
+            </p>
+          </div>
+
+          <div class="lore-actions">
+            <button
+              (click)="insertLoreIntoScript(entry.fact)"
+              class="btn btn-small btn-action"
+              title="Insert into script"
+            >
+              ➕
+            </button>
+            <button (click)="deleteLore(i)" class="btn btn-small btn-danger" title="Delete lore">
+              🗑️
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN PANEL: Scriptwriting Editor (75%) -->
+  <main class="editor-container">
+    <!-- Editor Header -->
+    <div class="editor-header">
+      <div class="header-left">
+        <h2>✍️ Script Editor</h2>
+        <p class="editor-subtitle">Focus on the story. We handle the context.</p>
+      </div>
+      <div class="header-right">
+        <button
+          (click)="exportScript()"
+          [disabled]="!scriptContent"
+          class="btn btn-secondary"
+          title="Export script to file"
+        >
+          📥 Export
+        </button>
+        <button
+          (click)="clearScript()"
+          [disabled]="!scriptContent"
+          class="btn btn-secondary"
+          title="Clear script"
+        >
+          🗑️ Clear
+        </button>
+      </div>
+    </div>
+
+    <!-- Editor Main Area -->
+    <div class="editor-main">
+      <div *ngIf="generatedScene" class="generated-box">
+        <h3>Last generated scene</h3>
+        <pre>{{ generatedScene }}</pre>
+      </div>
+
+      <textarea
+        [(ngModel)]="scriptContent"
+        placeholder="Start writing your scene here... Your Story Bible context will assist you when you generate scenes."
+        class="script-textarea"
+        spellcheck="false"
+      ></textarea>
+
+      <!-- Floating Generate Button -->
+      <button
+        (click)="generateScene()"
+        [disabled]="isGenerating || !scriptContent.trim()"
+        class="btn btn-generate"
+        [class.generating]="isGenerating"
+        title="Generate next scene using RAG"
+      >
+        <span *ngIf="!isGenerating">⚡ Generate Scene</span>
+        <span *ngIf="isGenerating" class="spinner-inline">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </span>
+      </button>
+
+      <!-- display context used from story bible -->
+      <div *ngIf="contextUsed?.length" class="context-box">
+        <h4>Context used:</h4>
+        <ul>
+          <li *ngFor="let fact of contextUsed">{{ fact }}</li>
+        </ul>
+      </div>
+      <div *ngIf="!generatedScene && !isGenerating" class="error-box">
+        <p *ngIf="generatedScene === ''">
+          No scene generated yet – make sure the request succeeds and returns text.
+        </p>
+      </div>
+
+      <!-- Loading Overlay during Generation -->
+      <div *ngIf="showGenerationSpinner" class="generation-overlay">
+        <div class="spinner-large">
+          <div class="spinner-ring"></div>
+          <p class="spinner-text">Gemini Flash is crafting your scene...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Word Count Footer -->
+    <div class="editor-footer">
+      <div class="stats">
+        <span class="stat-item">
+          📝 Words: <strong>{{ scriptContent.split(/\s+/).filter(w => w).length }}</strong>
+        </span>
+        <span class="stat-item">
+          📄 Characters: <strong>{{ scriptContent.length }}</strong>
+        </span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Terminal Toast: Real-time RAG Logs -->
+<div class="toast-container" [class.visible]="showToast">
+  <div class="toast">
+    <span class="toast-icon">💻</span>
+    <span class="toast-message">{{ currentLogMessage }}</span>
+  </div>
+</div>
