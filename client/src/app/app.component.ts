@@ -1,5 +1,5 @@
 // client/src/app/app.component.ts
-import { Component, OnInit, NgZone, OnDestroy } from '@angular/core';
+import { Component, OnInit, NgZone, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { ApiService, LoreEntry, GenerationResponse } from './api.service';
 
@@ -31,6 +31,7 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor(
     private apiService: ApiService,
     private ngZone: NgZone,
+    private cd: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -84,43 +85,69 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   generateScene(): void {
+    console.log('generateScene() called; scriptContent=', this.scriptContent);
     if (!this.scriptContent.trim()) {
       this.apiService.emitLog('⚠ Please enter a scene prompt');
       return;
     }
 
+    // wipe previous result while the new one is being created
+    this.generatedScene = '';
     this.isGenerating = true;
     this.showGenerationSpinner = true;
 
-    this.apiService
+    // ensure change detection occurs even if the HTTP callback leaves the zone
+    const obs = this.apiService
       .generateWithContext(this.scriptContent)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (response: GenerationResponse) => {
-          console.log('API response:', response);
-          const scene = response.scene || '';
-          // always push the raw generated scene into the textarea so users cannot miss it
-          if (scene) {
-            this.generatedScene = scene;
-            this.scriptContent = scene; // replace existing content for clarity
-          } else {
-            console.warn('Empty scene returned from API');
-          }
+      .pipe(takeUntil(this.destroy$));
+    obs.subscribe({
+      next: (response: GenerationResponse) => {
+        console.log('subscription.next triggered');
+        this.ngZone.run(() => {
+          // response may sometimes come back as a plain string if parsing fails,
+          // so guard accordingly and always update the UI state
+          console.log('API response inside run:', response);
 
-          // capture which lore snippets were used
-          this.contextUsed = response.context_used || [];
+          const scene = (response && (response as any).scene) ?? '';
+          // write the returned text to both helpers so it is obvious to the user
+          this.generatedScene = scene;
+          this.scriptContent = scene;
+
+          // scroll preview into view so user can't miss it
+          setTimeout(() => {
+            const box = document.querySelector('.generated-box');
+            if (box) {
+              box.scrollIntoView({ behavior: 'smooth' });
+            }
+          });
+
+          // log state for debugging
+          console.log('scene assigned, generatedScene=', this.generatedScene);
+          console.log('spinner before hide:', this.showGenerationSpinner);
+
+          // record any lore that was used (array may include nulls)
+          this.contextUsed = ((response && response.context_used) || []).filter(Boolean);
 
           this.isGenerating = false;
           this.showGenerationSpinner = false;
-        },
-
-        error: (error) => {
+          console.log('spinner after hide:', this.showGenerationSpinner);
+          // ensure template updates immediately
+          this.cd.detectChanges();
+        });
+      },
+      error: (error) => {
+        console.log('subscription.error triggered');
+        this.ngZone.run(() => {
           console.error('Error generating scene:', error);
           this.apiService.emitLog('✗ Generation failed');
           this.isGenerating = false;
           this.showGenerationSpinner = false;
-        },
-      });
+        });
+      },
+      complete: () => {
+        console.log('subscription.complete');
+      },
+    });
   }
 
   private setupLogListener(): void {

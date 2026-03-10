@@ -139,13 +139,13 @@
         </p>
       </div>
 
-      <!-- Loading Overlay during Generation -->
-      <div *ngIf="showGenerationSpinner" class="generation-overlay">
+      <!-- Loading Overlay during Generation (always in DOM; visibility controlled by class) -->
+      <!-- <div class="generation-overlay" [class.visible]="showGenerationSpinner">
         <div class="spinner-large">
           <div class="spinner-ring"></div>
           <p class="spinner-text">Gemini Flash is crafting your scene...</p>
         </div>
-      </div>
+      </div> -->
     </div>
 
     <!-- Word Count Footer -->
